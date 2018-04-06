@@ -1,4 +1,7 @@
-﻿using System.Collections.Concurrent;
+using System;
+using System.Collections.Concurrent;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 
 namespace SNITestApp
@@ -14,16 +17,34 @@ namespace SNITestApp
 
         private static X509Certificate2 LoadCertificate(string serverName)
         {
-            var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
-            store.Open(OpenFlags.ReadOnly);
-            var certificates = store.Certificates.Find(X509FindType.FindBySubjectName, serverName, validOnly: false);
-            if(certificates.Count > 0)
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                return certificates[0];
+                var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
+                store.Open(OpenFlags.ReadOnly);
+                var certificates =
+                    store.Certificates.Find(X509FindType.FindBySubjectName, serverName, validOnly: false);
+                if (certificates.Count > 0)
+                {
+                    return certificates[0];
+                }
+                else
+                {
+                    return null;
+                }
             }
             else
             {
-                return null;
+                var certsPath = Environment.GetEnvironmentVariable("ASPNETCORE_CERTIFICATES");
+                var certPath = Path.Combine(certsPath, $"{serverName}.pfx");
+                if (File.Exists(certPath))
+                {
+                    Console.WriteLine("Loading certificate: " + certPath);
+                    return new X509Certificate2(certPath, password: "test");
+                }
+                else
+                {
+                    return null;
+                }
             }
         }
     }
